@@ -9,3 +9,8 @@
   hosts: control_plane
   roles:
   - k8s-master
+
+- name: Join Worker Nodes
+  hosts: workers
+  roles:
+  - k8s-worker

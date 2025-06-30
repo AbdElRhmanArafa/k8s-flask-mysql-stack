@@ -1,0 +1,8 @@
+- name: Verify worker node is added to the cluster
+  shell: |
+    kubectl get nodes | grep "{{ inventory_hostname }}" | grep "Ready"
+  register: node_status
+  retries: 5
+  delay: 10
+  until: node_status.rc == 0
+  failed_when: node_status.rc != 0

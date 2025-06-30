@@ -4,9 +4,8 @@
     enabled: yes
     name: containerd
 
-
 - name: enable and restart kubelet
   ansible.builtin.systemd:
-    name:  kubelet
+    name: kubelet
     enabled: yes
     state: restarted

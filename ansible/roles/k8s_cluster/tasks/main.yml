@@ -101,7 +101,6 @@
   ansible.builtin.command:
     cmd: gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg /tmp/kubernetes-release.key
 
-
 - name: Ensure /etc/apt/sources.list.d directory exists
   ansible.builtin.file:
     path: /etc/apt/sources.list.d
@@ -114,7 +113,6 @@
     line: 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /'
     create: yes
     mode: '0644'
-
 
 - name: apt install kubeadm, kubelet, and kubectl
   ansible.builtin.apt:

@@ -1,0 +1,6 @@
+---
+
+- name: Prepare Cluster
+  hosts: k8s_cluster
+  roles:
+  - k8s_cluster

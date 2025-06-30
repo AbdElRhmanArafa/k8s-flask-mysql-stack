@@ -6,3 +6,4 @@
   delay: 10
   until: node_status.rc == 0
   failed_when: node_status.rc != 0
+  become_user: "{{ ansible_user }}"

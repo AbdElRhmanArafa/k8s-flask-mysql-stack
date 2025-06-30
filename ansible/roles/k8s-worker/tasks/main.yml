@@ -2,7 +2,7 @@
 
 - name: Set hostname
   ansible.builtin.hostname:
-    name: "{{ inventory_hostname }}_{{ groups['workers'].index(inventory_hostname) + 1 }}"
+    name: "{{ inventory_hostname }}-{{ groups['workers'].index(inventory_hostname) + 1 }}"
 
 - name: Check if containerd is installed and running
   ansible.builtin.service:
@@ -11,11 +11,66 @@
   register: containerd_status
   failed_when: containerd_status.state is not defined or containerd_status.state != "started"
 
+- name: Check if node is already joined to the cluster
+  shell: "kubectl --kubeconfig=/etc/kubernetes/kubelet.conf get nodes | grep $(hostname)"
+  register: node_check
+  ignore_errors: true
+  changed_when: false
+
+- name: Check if join command is available
+  set_fact:
+    join_command_available: "{{ hostvars[groups['control_plane'][0]].kubeadm_join_command is defined }}"
+  ignore_errors: true
+
 - name: Join the worker node to the Kubernetes cluster
-  shell: |
-    {{ hostvars[groups['control_plane'][0]].kubeadm_join_command }}
+  shell: "{{ hostvars[groups['control_plane'][0]].kubeadm_join_command }}"
   register: join_result
+  when:
+  - join_command_available | bool
+  - node_check is failed
   failed_when:
   - join_result.rc != 0
   - "'already exists' not in join_result.stderr"
+
+- name: Generate join command on master if not available
+  block:
+  - name: Connect to master to get join command
+    delegate_to: "{{ groups['control_plane'][0] }}"
+    shell: "kubeadm token create --print-join-command"
+    register: generated_join_command
+    when: not join_command_available | bool and node_check is failed
+
+  - name: Set generated join command as a fact
+    set_fact:
+      worker_join_command: "{{ generated_join_command.stdout }}"
+    when: not join_command_available | bool and node_check is failed and generated_join_command is defined
+
+  - name: Join worker using generated command
+    shell: "{{ worker_join_command }}"
+    register: join_result
+    when: not join_command_available | bool and node_check is failed and worker_join_command is defined
+    failed_when:
+    - join_result.rc != 0
+    - "'already exists' not in join_result.stderr"
+  when: not join_command_available | bool and node_check is failed
+  ignore_errors: true
+
+- name: Create a directory for the kubelet configuration
+  ansible.builtin.file:
+    path: ~/.kube
+    state: directory
+    mode: '0755'
+  become_user: "{{ ansible_user }}"
+
+- name: Copy the kubeconfig file to the worker node
+  ansible.builtin.copy:
+    src: ./config
+    dest: "/home/{{ ansible_user }}/.kube/config"
+  become: true
+  notify: Verify worker node is added to the cluster
+
+- name: Label worker nodes with role
+  ansible.builtin.command:
+    cmd: "kubectl --kubeconfig=/etc/kubernetes/admin.conf label node {{ inventory_hostname }}-{{ groups['workers'].index(inventory_hostname) + 1 }} node-role.kubernetes.io/worker=worker --overwrite=true"
+  delegate_to: "{{ groups['control_plane'][0] }}"
   notify: Verify worker node is added to the cluster

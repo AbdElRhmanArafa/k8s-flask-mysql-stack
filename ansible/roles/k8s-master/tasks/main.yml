@@ -2,7 +2,7 @@
 
 - name: Set hostname
   ansible.builtin.hostname:
-    name: "{{ inventory_hostname }}_{{ groups['control_plane'].index(inventory_hostname) + 1 }}"
+    name: "{{ inventory_hostname }}-{{ groups['control_plane'].index(inventory_hostname) + 1 }}"
 
 - name: Check if containerd is installed and running
   ansible.builtin.service:
@@ -10,28 +10,6 @@
     state: started
   register: containerd_status
   failed_when: containerd_status.state is not defined or containerd_status.state != "started"
-
-- name: Check required ports are available
-  ansible.builtin.wait_for:
-    port: "{{ item }}"
-    state: stopped
-    timeout: 5
-  with_items:
-  - 6443 # Kubernetes API server
-  - 2379 # etcd server client API
-  - 2380 # etcd server peer API
-  - 10250 # Kubelet API
-  - 10251 # kube-scheduler
-  - 10252 # kube-controller-manager
-  ignore_errors: true
-  register: ports_check
-  failed_when: ports_check is failed
-
-- name: Check system requirements
-  ansible.builtin.shell: grep -E "^(vmx|svm)" /proc/cpuinfo
-  register: virt_support
-  changed_when: false
-  ignore_errors: true
 
 - name: Check if Kubernetes cluster is already initialized
   stat:
@@ -57,20 +35,21 @@
   - not k8s_admin_conf.stat.exists
   - kubeadm_init_result is defined
 
-- name: Extract join command from kubeadm init output
-  shell: |
-    grep -A 2 "kubeadm join" /tmp/kubeadm-init-output.txt | tr -d '\n\\' | sed 's/^[ \t]*//'
-  register: join_command
+- name: Extract worker join command
+  set_fact:
+    worker_join_command: "{{ kubeadm_init_result.stdout | regex_search('kubeadm join [\\s\\S]*?discovery-token-ca-cert-hash \\S+', multiline=True) | default('', true) |  regex_replace('[
+
+      \t\\\\]', ' ')  }}"
   when:
   - not k8s_admin_conf.stat.exists
   - kubeadm_init_result is defined
 
 - name: Set kubeadm join command as a fact
   set_fact:
-    kubeadm_join_command: "{{ join_command.stdout }}"
+    kubeadm_join_command: "{{ worker_join_command }}"
   when:
   - not k8s_admin_conf.stat.exists
-  - join_command is defined
+  - worker_join_command is defined
 
 - name: Ensure ~/.kube directory exists
   ansible.builtin.file:
@@ -101,10 +80,3 @@
     dest: "./config"
     flat: yes
   when: not k8s_admin_conf.stat.exists
-
-- name: Verify cluster is running
-  shell: kubectl get nodes
-  register: kubectl_nodes
-  retries: 5
-  delay: 10
-  until: kubectl_nodes.rc == 0

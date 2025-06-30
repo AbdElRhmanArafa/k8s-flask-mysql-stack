@@ -65,6 +65,13 @@
   - not k8s_admin_conf.stat.exists
   - kubeadm_init_result is defined
 
+- name: Set kubeadm join command as a fact
+  set_fact:
+    kubeadm_join_command: "{{ join_command.stdout }}"
+  when:
+  - not k8s_admin_conf.stat.exists
+  - join_command is defined
+
 - name: Ensure ~/.kube directory exists
   ansible.builtin.file:
     path: "~/.kube"

@@ -1,0 +1,103 @@
+---
+
+- name: Set hostname
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname }}_{{ groups['control_plane'].index(inventory_hostname) + 1 }}"
+
+- name: Check if containerd is installed and running
+  ansible.builtin.service:
+    name: containerd
+    state: started
+  register: containerd_status
+  failed_when: containerd_status.state is not defined or containerd_status.state != "started"
+
+- name: Check required ports are available
+  ansible.builtin.wait_for:
+    port: "{{ item }}"
+    state: stopped
+    timeout: 5
+  with_items:
+  - 6443 # Kubernetes API server
+  - 2379 # etcd server client API
+  - 2380 # etcd server peer API
+  - 10250 # Kubelet API
+  - 10251 # kube-scheduler
+  - 10252 # kube-controller-manager
+  ignore_errors: true
+  register: ports_check
+  failed_when: ports_check is failed
+
+- name: Check system requirements
+  ansible.builtin.shell: grep -E "^(vmx|svm)" /proc/cpuinfo
+  register: virt_support
+  changed_when: false
+  ignore_errors: true
+
+- name: Check if Kubernetes cluster is already initialized
+  stat:
+    path: /etc/kubernetes/admin.conf
+  register: k8s_admin_conf
+
+- name: Initialize Kubernetes cluster with kubeadm
+  shell: |
+    kubeadm init 
+  register: kubeadm_init_result
+  when: not k8s_admin_conf.stat.exists
+  failed_when:
+  - kubeadm_init_result.rc != 0
+  - "'already exists' not in kubeadm_init_result.stderr"
+  notify: configure k8s network
+
+- name: Save kubeadm init output to file
+  copy:
+    content: "{{ kubeadm_init_result.stdout }}"
+    dest: /tmp/kubeadm-init-output.txt
+    mode: '0600'
+  when:
+  - not k8s_admin_conf.stat.exists
+  - kubeadm_init_result is defined
+
+- name: Extract join command from kubeadm init output
+  shell: |
+    grep -A 2 "kubeadm join" /tmp/kubeadm-init-output.txt | tr -d '\n\\' | sed 's/^[ \t]*//'
+  register: join_command
+  when:
+  - not k8s_admin_conf.stat.exists
+  - kubeadm_init_result is defined
+
+- name: Ensure ~/.kube directory exists
+  ansible.builtin.file:
+    path: "~/.kube"
+    state: directory
+    mode: "0755"
+  become_user: "{{ ansible_user }}"
+  when: not k8s_admin_conf.stat.exists
+
+- name: Copy /etc/kubernetes/admin.conf to ~/.kube/config
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    dest: "/home/{{ ansible_user }}/.kube/config"
+    remote_src: true
+  become: true
+  when: not k8s_admin_conf.stat.exists
+
+- name: Set permissions on ~/.kube/config
+  ansible.builtin.file:
+    path: "/home/{{ ansible_user }}/.kube/config"
+    mode: '0755'
+  become: true
+  when: not k8s_admin_conf.stat.exists
+
+- name: Copy /etc/kubernetes/admin.conf to ./config
+  ansible.builtin.fetch:
+    src: /etc/kubernetes/admin.conf
+    dest: "./config"
+    flat: yes
+  when: not k8s_admin_conf.stat.exists
+
+- name: Verify cluster is running
+  shell: kubectl get nodes
+  register: kubectl_nodes
+  retries: 5
+  delay: 10
+  until: kubectl_nodes.rc == 0

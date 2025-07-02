@@ -14,3 +14,8 @@
   hosts: workers
   roles:
   - k8s-worker
+
+- name: Setup NFS Server
+  hosts: nfs
+  roles:
+  - k8s_nfs

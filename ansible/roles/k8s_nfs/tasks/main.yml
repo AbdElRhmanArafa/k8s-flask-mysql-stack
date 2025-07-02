@@ -1,0 +1,31 @@
+---
+
+- name: Set hostname
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname }}-{{ groups['nfs'].index(inventory_hostname) + 1 }}"
+
+- name: Install NFS server 
+  ansible.builtin.apt:
+    name: nfs-kernel-server
+    state: present
+  notify: start nfs-kernel-server
+    
+- name: Create directory to share
+  ansible.builtin.file:
+    path: /mnt/nfs_share
+    state: directory
+    owner: nobody
+    group: nogroup
+    mode: '0777'
+
+- name: Configure NFS exports
+  ansible.builtin.lineinfile:
+    path: /etc/exports
+    line: '/mnt/nfs_share *(rw,sync,no_subtree_check,no_root_squash)'
+    create: yes
+  notify: reload nfs exports
+
+- name: Export the shared directory
+  ansible.builtin.command: exportfs -a
+  changed_when: false
+

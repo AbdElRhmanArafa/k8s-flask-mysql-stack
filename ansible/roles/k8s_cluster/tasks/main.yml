@@ -124,3 +124,14 @@
   - kubelet
   - kubectl
   notify: enable and restart kubelet
+
+- name: install nfs client
+  ansible.builtin.apt:
+    name: nfs-common
+    state: present
+
+- name: enable nfs client
+  ansible.builtin.systemd:
+    name: nfs-client.target
+    enabled: yes
+    state: started

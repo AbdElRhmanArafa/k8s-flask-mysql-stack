@@ -1,0 +1,2 @@
+nfs_path: "/mnt/nfs_share"
+nfs_server: "192.168.121.12"

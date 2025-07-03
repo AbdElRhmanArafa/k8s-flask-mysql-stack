@@ -1,0 +1,19 @@
+{{- if and .Values.pv.enabled .Values.pv.createStorageClass -}}
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+    name: {{ .Values.pv.storageClass }}
+    labels:
+        app: {{ .Release.Name }}
+        chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+        release: {{ .Release.Name }}
+        heritage: {{ .Release.Service }}
+provisioner: k8s-sigs.io/nfs-subdir-external-provisioner # Common NFS external provisioner
+parameters:
+    server: {{ .Values.pv.nfs.server }}
+    path: {{ .Values.pv.nfs.path }}
+    readOnly: "{{ .Values.pv.nfs.readOnly }}"
+reclaimPolicy: {{ .Values.pv.nfs.reclaimPolicy }}
+volumeBindingMode: {{ .Values.pv.nfs.volumeBindingMode }}
+allowVolumeExpansion: {{ .Values.pv.nfs.allowVolumeExpansion }}
+{{- end }}

@@ -1,0 +1,36 @@
+1. MySQL server information:
+   - Name: {{ include "mysql.fullname" . }}
+   - Port: {{ .Values.service.port }}
+   - Database: {{ .Values.mysql.database }}
+   - User: {{ .Values.mysql.user }}
+
+2. To check status:
+   kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "mysql.name" . }},app.kubernetes.io/instance={{ .Release.Name }}"
+
+{{- if .Values.pv.enabled }}
+3. Persistent Storage Notes:
+   - You're using NFS for persistent storage
+   - NFS server: {{ .Values.pv.nfs.server }}:{{ .Values.pv.nfs.path }}
+   - Storage Class: {{ .Values.pv.storageClass }}
+
+4. Storage Provisioning:
+   - You're using dynamic provisioning via the StorageClass "{{ .Values.pv.storageClass }}"
+   - This requires an NFS provisioner that supports your StorageClass
+
+5. If PVC remains in Pending status:
+   a) Check if StorageClass exists and has a provisioner:
+      kubectl get storageclass {{ .Values.pv.storageClass }}
+   
+   b) If not found or there's no provisioner:
+      Install the NFS provisioner using:
+      ./scripts/sync-nfs-config.sh
+      
+      This will ensure consistent values between your provisioner and chart.
+
+6. Check volume status:
+   - kubectl get pv
+   - kubectl get pvc --namespace {{ .Release.Namespace }}
+{{- end }}
+
+6. Connect to MySQL:
+   kubectl run -i --tty --rm mysql-client --image=mysql:8.0 --restart=Never --namespace {{ .Release.Namespace }} -- mysql -h {{ include "mysql.fullname" . }} -u {{ .Values.mysql.user }} -p

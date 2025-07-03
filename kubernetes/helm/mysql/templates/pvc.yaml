@@ -1,0 +1,23 @@
+{{- if .Values.pv.enabled -}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+    name: {{ include "mysql.fullname" . }}
+    labels:
+        {{- include "mysql.labels" . | nindent 4 }}
+    {{- if .Values.pv.annotations }}
+    annotations:
+        {{- toYaml .Values.pv.annotations | nindent 4 }}
+    {{- end }}
+spec:
+    accessModes:
+        - {{ .Values.pv.accessMode }}
+    resources:
+        requests:
+            storage: {{ .Values.pv.size }}
+    {{- if .Values.pv.storageClass }}
+    storageClassName: {{ .Values.pv.storageClass }}
+    {{- else }}
+    storageClassName: ""
+    {{- end }}
+{{- end }}

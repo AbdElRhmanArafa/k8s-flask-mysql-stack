@@ -1,0 +1,52 @@
+---
+- name: Create monitoring namespace
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "{{ monitoring_namespace }}"
+
+- name: Deploy Node Exporter DaemonSet
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+    src: "{{ node_exporter_daemonset_file }}"
+
+- name: Deploy Node Exporter Service
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+    src: "{{ node_exporter_service_file }}"
+
+- name: Deploy Prometheus ServiceAccount
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+    src: "{{ prometheus_serviceaccount_file }}"
+
+- name: Deploy Prometheus ConfigMap
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+    src: "{{ prometheus_configmap_file }}"
+
+- name: Deploy Prometheus Deployment
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+    src: "{{ prometheus_deployment_file }}"
+
+- name: Deploy Prometheus Service
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+    src: "{{ prometheus_service_file }}"
+
+- name: Deploy Monitoring Ingress
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+    src: "{{ monitoring_ingress_file }}"

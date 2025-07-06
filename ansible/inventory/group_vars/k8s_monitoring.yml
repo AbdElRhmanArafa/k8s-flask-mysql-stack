@@ -1,0 +1,17 @@
+---
+# Prometheus and monitoring configuration variables
+project_root: "/home/arafa/Projects/WebDev/project_github/k8s-flask-mysql-stack"
+prometheus_manifests_path: "{{ project_root }}/kubernetes/manifests/prometheus"
+node_exporter_daemonset_file: "{{ prometheus_manifests_path }}/node-exporter-daemonset.yaml"
+node_exporter_service_file: "{{ prometheus_manifests_path }}/node-exporter-service.yaml"
+prometheus_serviceaccount_file: "{{ prometheus_manifests_path }}/prometheus-serviceaccount.yaml"
+prometheus_configmap_file: "{{ prometheus_manifests_path }}/prometheus-configmap.yaml"
+prometheus_deployment_file: "{{ prometheus_manifests_path }}/prometheus-deployment.yaml"
+prometheus_service_file: "{{ prometheus_manifests_path }}/prometheus-service.yaml"
+monitoring_ingress_file: "{{ project_root }}/kubernetes/manifests/ingress/monitoring-ingress.yml"
+
+# Namespace configuration
+monitoring_namespace: monitoring
+
+# Kubeconfig path - this can be overridden at runtime
+kubeconfig_path: "/home/arafa/Projects/WebDev/project_github/k8s-flask-mysql-stack/ansible/config"

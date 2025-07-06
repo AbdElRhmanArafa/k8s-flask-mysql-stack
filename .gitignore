@@ -1,1 +1,9 @@
 Kubernetes_Project_Assignment_FlaskApp_with_Database.pdf
+
+# Instead of /vagrant
+/vagrant/*
+!vagrant/Vagrantfile
+
+.vscode/*
+ansible/config
+TODO.md

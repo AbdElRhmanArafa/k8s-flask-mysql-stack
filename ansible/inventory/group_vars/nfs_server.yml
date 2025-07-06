@@ -1,0 +1,5 @@
+nfs_path: "/mnt/nfs_share"
+nfs_server: "192.168.121.12"
+PATH_to_helm_chart: "/home/arafa/Projects/WebDev/project_github/k8s-flask-mysql-stack/kubernetes/helm/flaskapp"
+PATH_to_helm_chart_sql: "/home/arafa/Projects/WebDev/project_github/k8s-flask-mysql-stack/kubernetes/helm/mysql"
+kubeconfig_path: "/home/arafa/Projects/WebDev/project_github/k8s-flask-mysql-stack/ansible/config"

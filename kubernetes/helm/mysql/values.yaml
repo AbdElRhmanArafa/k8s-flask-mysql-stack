@@ -125,8 +125,8 @@ affinity: {}
 # MySQL configuration
 mysql:
   rootPassword: "rootpassword"
-  password: "password"
-  database: "taskmanager"
+  password: "flaskpassword"
+  database: "flaskapp"
   user: "admin"
 
 # This section configures persistent volume claims for the MySQL database

@@ -9,7 +9,7 @@ replicaCount: 1
 image:
   repository: abdelrahman2arafa/task-manager-app
   # This sets the pull policy for images.
-  pullPolicy: IfNotPresent  # Always, IfNotPresent, Never
+  pullPolicy: IfNotPresent # Always, IfNotPresent, Never
   # Overrides the image tag whose default is the chart appVersion.
   tag: "latest"
 
@@ -92,13 +92,15 @@ livenessProbe:
   initialDelaySeconds: 30
   periodSeconds: 10
   timeoutSeconds: 5
+  failureThreshold: 3
 readinessProbe:
   httpGet:
     path: /api/status
     port: 5000
-  initialDelaySeconds: 10
+  initialDelaySeconds: 15
   periodSeconds: 5
   timeoutSeconds: 2
+  failureThreshold: 3
 
 # This section is for setting up autoscaling more information can be found here: https://kubernetes.io/docs/concepts/workloads/autoscaling/
 autoscaling:
@@ -126,3 +128,10 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+# Database configuration
+database:
+  host: "mysql" # Use the service name, not the IP address
+  user: "admin"
+  name: "taskmanager"
+  secretName: "mysql"

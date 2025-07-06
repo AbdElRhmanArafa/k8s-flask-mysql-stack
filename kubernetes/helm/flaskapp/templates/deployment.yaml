@@ -40,9 +40,30 @@ spec:
           {{- end }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "flaskapp.fullname" . }}-config
+                  key: DB_HOST
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "flaskapp.fullname" . }}-config
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.secretName }}
+                  key: mysql-password
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "flaskapp.fullname" . }}-config
+                  key: DB_NAME
           ports:
             - name: http
-              containerPort: {{ .Values.service.port }}
+              containerPort: 5000
               protocol: TCP
           {{- with .Values.livenessProbe }}
           livenessProbe:

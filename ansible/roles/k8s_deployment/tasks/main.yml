@@ -2,31 +2,150 @@
   community.kubernetes.helm_repository:
     name: nfs-subdir-external-provisioner
     repo_url: https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner/
+  notify: Update Helm repositories
 
 - name: Install nfs-subdir-external-provisioner
   community.kubernetes.helm:
     name: nfs-subdir-external-provisioner
     chart_ref: nfs-subdir-external-provisioner/nfs-subdir-external-provisioner
     release_namespace: kube-system
-    kubeconfig: ~/.kube/config
+    kubeconfig: "{{ kubeconfig_path }}"
     create_namespace: true
+    timeout: 300s
     values:
       nfs:
         server: "{{ nfs_server }}"
         path: "{{ nfs_path }}"
+
+- name: Add ingress-nginx repository
+  community.kubernetes.helm_repository:
+    name: ingress-nginx
+    repo_url: https://kubernetes.github.io/ingress-nginx
+  notify: Update Helm repositories
+
+- name: Install ingress-nginx using Helm
+  community.kubernetes.helm:
+    name: ingress-nginx
+    chart_ref: ingress-nginx/ingress-nginx
+    release_namespace: ingress-nginx
+    kubeconfig: "{{ kubeconfig_path }}"
+    create_namespace: true
+    timeout: 600s
+    values:
+      controller:
+        service:
+          type: NodePort
+          nodePorts:
+            http: 30080
+            https: 30443
 
 - name: Install Flask application using Helm
   community.kubernetes.helm:
     name: flaskapp
     chart_ref: "{{ PATH_to_helm_chart }}"
     release_namespace: default
-    kubeconfig: ~/.kube/config
+    kubeconfig: "{{ kubeconfig_path }}"
     create_namespace: true
+    timeout: 300s
 
 - name: Install mysql using Helm
   community.kubernetes.helm:
     name: mysql
     chart_ref: "{{ PATH_to_helm_chart_sql}}"
     release_namespace: default
-    kubeconfig: ~/.kube/config
+    kubeconfig: "{{ kubeconfig_path }}"
     create_namespace: true
+    timeout: 300s
+
+- name: Wait for ingress-nginx controller pods to be ready
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: ingress-nginx
+    label_selectors:
+    - app.kubernetes.io/component=controller
+    - app.kubernetes.io/name=ingress-nginx
+    kubeconfig: "{{ kubeconfig_path }}"
+  register: ingress_pods
+  until:
+  - ingress_pods.resources is defined
+  - ingress_pods.resources | length > 0
+  - (ingress_pods.resources | map(attribute='status.phase') | list | unique == ["Running"])
+  retries: 30
+  delay: 10
+
+- name: Apply Flask application ingress manifest
+  k8s:
+    state: present
+    src: "/home/arafa/Projects/WebDev/project_github/k8s-flask-mysql-stack/kubernetes/manifests/ingress/flask-ingress.yml"
+    namespace: default
+    kubeconfig: "{{ kubeconfig_path }}"
+
+- name: Run access helper script
+  command: /tmp/access_flask_app.sh
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: script_output
+  changed_when: false
+
+- name: Display script output
+  debug:
+    var: script_output.stdout_lines
+
+- name: Apply LimitRange manifest
+  k8s:
+    state: present
+    src: "/home/arafa/Projects/WebDev/project_github/k8s-flask-mysql-stack/kubernetes/manifests/Limits/limit-range.yaml"
+    namespace: default
+    kubeconfig: "{{ kubeconfig_path }}"
+
+- name: Apply ResourceQuota manifest
+  k8s:
+    state: present
+    src: "/home/arafa/Projects/WebDev/project_github/k8s-flask-mysql-stack/kubernetes/manifests/Limits/resource-quota.yaml"
+    namespace: default
+    kubeconfig: "{{ kubeconfig_path }}"
+
+- name: Create access helper script
+  copy:
+    content: |
+      #!/bin/bash
+
+      # Script to help access the Flask application through ingress
+      KUBECONFIG="{{ kubeconfig_path }}"
+      export KUBECONFIG
+
+      # Get the first node's IP address
+      NODE_IP=$(kubectl --kubeconfig="$KUBECONFIG" get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+
+      # Check if the hostname is already in /etc/hosts
+      if grep -q "flaskapp" /etc/hosts; then
+        echo "Host entry for flaskapp already exists in /etc/hosts"
+      else
+        echo "To add the host entry automatically, run this script with sudo:"
+        echo "sudo KUBECONFIG=$KUBECONFIG $0"
+        if [ "$EUID" -eq 0 ]; then
+          echo "$NODE_IP flaskapp" >> /etc/hosts
+          echo "Added 'flaskapp' host entry to /etc/hosts"
+        fi
+      fi
+
+      # Print access information
+      echo "====================================================================="
+      echo "Access your Flask application using one of these URLs:"
+      echo ""
+      echo "1. Using Node IP:   http://$NODE_IP:30080"
+      echo "2. Using hostname:  http://flaskapp:30080"
+      echo ""
+      echo "If your application doesn't load, please check:"
+      echo "  - The ingress controller is running: kubectl --kubeconfig=$KUBECONFIG get pods -n ingress-nginx"
+      echo "  - The ingress resource exists: kubectl --kubeconfig=$KUBECONFIG get ingress"
+      echo "  - The Flask application pods are running: kubectl --kubeconfig=$KUBECONFIG get pods"
+      echo "====================================================================="
+
+      # Open the application in the default browser if on a desktop
+      if command -v xdg-open &> /dev/null; then
+        echo "Opening application in browser..."
+        xdg-open "http://$NODE_IP:30080"
+      fi
+    dest: /tmp/access_flask_app.sh
+    mode: '0755'

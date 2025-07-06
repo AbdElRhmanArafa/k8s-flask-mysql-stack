@@ -24,6 +24,6 @@
   hosts: localhost
   become: true
   vars_files:
-  - inventory/group_vars/nfs.yml
+  - inventory/group_vars/nfs_server.yml
   roles:
   - k8s_deployment

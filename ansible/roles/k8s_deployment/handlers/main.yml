@@ -1,0 +1,5 @@
+---
+- name: Update Helm repositories
+  shell: helm repo update
+  args:
+    executable: /bin/bash
